@@ -326,6 +326,21 @@ function ConvertTo-MaskLength
     return $Bits.Length
 }
 
+function ConvertTo-SubnetMask
+{
+  param(
+    [Parameter(Mandatory = $true, Position = 0)]
+    [Uint32] $PrefixLength
+  )
+    if ($PrefixLength -eq 0)
+    {
+        return 0
+    }
+    else
+    {
+        return ([UInt32]::MaxValue) -shl (32 - $PrefixLength)
+    }
+}
 
 function Get-MgmtSubnet
 {
@@ -338,10 +353,11 @@ function Get-MgmtSubnet
       throw "Failed to find a suitable network adapter, check your network settings."
     }
     $addr = (Get-NetIPAddress -InterfaceAlias $na.ifAlias -AddressFamily IPv4).IPAddress
-    $mask = (Get-WmiObject Win32_NetworkAdapterConfiguration | ? InterfaceIndex -eq $($na.ifIndex)).IPSubnet[0]
-    $mgmtSubnet = (ConvertTo-DecimalIP $addr) -band (ConvertTo-DecimalIP $mask)
+    $prefixLength = (Get-NetIPAddress -InterfaceAlias $na.ifAlias -AddressFamily IPv4).PrefixLength
+    $mask = ConvertTo-SubnetMask $prefixLength
+    $mgmtSubnet = (ConvertTo-DecimalIP $addr) -band $mask
     $mgmtSubnet = ConvertTo-DottedDecimalIP $mgmtSubnet
-    return "$mgmtSubnet/$(ConvertTo-MaskLength $mask)"
+    return "$mgmtSubnet/$prefixLength"
 }
 
 function Get-MgmtDefaultGatewayAddress
